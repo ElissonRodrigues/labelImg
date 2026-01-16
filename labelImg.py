@@ -222,8 +222,10 @@ class MainWindow(QMainWindow, WindowMixin):
         copy_prev_bounding = action(get_str("copyPrevBounding"), self.copy_previous_bounding_boxes, "Ctrl+v", "copy", get_str("copyPrevBounding"))
 
         open_next_image = action(get_str("nextImg"), self.open_next_image, "d", "next", get_str("nextImgDetail"))
+        open_next_image.setShortcuts(["d", "Right"])
 
         open_prev_image = action(get_str("prevImg"), self.open_prev_image, "a", "prev", get_str("prevImgDetail"))
+        open_prev_image.setShortcuts(["a", "Left"])
 
         verify = action(get_str("verifyImg"), self.verify_image, "space", "verify", get_str("verifyImgDetail"))
 
@@ -522,6 +524,10 @@ class MainWindow(QMainWindow, WindowMixin):
         # Application state.
         self.image = QImage()
         self.file_path = ustr(default_filename)
+        if not self.file_path and settings.get(SETTING_FILENAME):
+            saved_path = ustr(settings.get(SETTING_FILENAME))
+            if os.path.exists(saved_path):
+                self.file_path = saved_path
         self.last_open_dir = None
         self.recent_files = []
         self.max_recent = 7
@@ -580,6 +586,11 @@ class MainWindow(QMainWindow, WindowMixin):
         if self.file_path and os.path.isdir(self.file_path):
             self.queue_event(partial(self.import_dir_images, self.file_path or ""))
         elif self.file_path:
+            # Se for um arquivo, carregamos o diretório pai primeiro (sem abrir a primeira imagem)
+            # para termos a lista de navegação populada.
+            parent_dir = os.path.dirname(self.file_path)
+            if os.path.exists(parent_dir):
+                self.queue_event(partial(self.import_dir_images, parent_dir, load_first=False))
             self.queue_event(partial(self.load_file, self.file_path or ""))
 
         # Callbacks:
@@ -1304,10 +1315,7 @@ class MainWindow(QMainWindow, WindowMixin):
             event.ignore()
         settings = self.settings
         # If it loads images from dir, don't load it at the beginning
-        if self.dir_name is None:
-            settings[SETTING_FILENAME] = self.file_path if self.file_path else ""
-        else:
-            settings[SETTING_FILENAME] = ""
+        settings[SETTING_FILENAME] = self.file_path if self.file_path else ""
 
         settings[SETTING_WIN_SIZE] = self.size()
         settings[SETTING_WIN_POSE] = self.pos()
@@ -1418,7 +1426,7 @@ class MainWindow(QMainWindow, WindowMixin):
         if self.file_path:
             self.show_bounding_box_from_annotation_file(file_path=self.file_path)
 
-    def import_dir_images(self, dir_path):
+    def import_dir_images(self, dir_path, load_first=True):
         if not self.may_continue() or not dir_path:
             return
 
@@ -1428,7 +1436,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.file_list_widget.clear()
         self.m_img_list = self.scan_all_images(dir_path)
         self.img_count = len(self.m_img_list)
-        self.open_next_image()
+        if load_first:
+            self.open_next_image()
         for imgPath in self.m_img_list:
             item = QListWidgetItem(imgPath)
             self.file_list_widget.addItem(item)
