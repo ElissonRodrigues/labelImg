@@ -179,6 +179,9 @@ class MainWindow(QMainWindow, WindowMixin):
         self.file_dock.setObjectName(get_str("files"))
         self.file_dock.setWidget(file_list_container)
 
+        self.prog_label = QLabel("Image: 0 / 0")
+        file_list_layout.addWidget(self.prog_label)
+
         self.zoom_widget = ZoomWidget()
         self.light_widget = LightWidget(get_str("lightWidgetTitle"))
         self.color_dialog = ColorDialog(parent=self)
@@ -482,6 +485,7 @@ class MainWindow(QMainWindow, WindowMixin):
             change_save_dir,
             open_next_image,
             open_prev_image,
+            delete_image,
             verify,
             save,
             save_format,
@@ -508,6 +512,7 @@ class MainWindow(QMainWindow, WindowMixin):
             change_save_dir,
             open_next_image,
             open_prev_image,
+            delete_image,
             save,
             save_format,
             None,
@@ -686,11 +691,19 @@ class MainWindow(QMainWindow, WindowMixin):
     def set_dirty(self):
         self.dirty = True
         self.actions.save.setEnabled(True)
+        # Change background color of current item in file list to indicate unsaved changes
+        item = self.file_list_widget.currentItem()
+        if item:
+            item.setBackground(QColor("#FFCCCC"))  # Light red highlight
 
     def set_clean(self):
         self.dirty = False
         self.actions.save.setEnabled(False)
         self.actions.create.setEnabled(True)
+        # Reset background color
+        item = self.file_list_widget.currentItem()
+        if item:
+            item.setBackground(Qt.transparent)  # Reset to default
 
     def toggle_actions(self, value=True):
         """Enable/Disable widgets which depend on an opened image."""
@@ -831,9 +844,10 @@ class MainWindow(QMainWindow, WindowMixin):
 
     # Tzutalin 20160906 : Add file list and dock to move faster
     def file_item_double_clicked(self, item=None):
-        self.cur_img_idx = self.m_img_list.index(ustr(item.text()))
-        filename = self.m_img_list[self.cur_img_idx]
+        filename = ustr(item.text())
         if filename:
+            self.cur_img_idx = self.m_img_list.index(filename)
+            self.update_progress_label()
             self.load_file(filename)
 
     # Add chris
@@ -1181,6 +1195,8 @@ class MainWindow(QMainWindow, WindowMixin):
                 index = self.m_img_list.index(unicode_file_path)
                 file_widget_item = self.file_list_widget.item(index)
                 file_widget_item.setSelected(True)
+                self.cur_img_idx = index
+                self.update_progress_label()
             else:
                 self.file_list_widget.clear()
                 self.m_img_list.clear()
@@ -1231,6 +1247,10 @@ class MainWindow(QMainWindow, WindowMixin):
 
             counter = self.counter_str()
             self.setWindowTitle(__appname__ + " " + file_path + " " + counter)
+
+            # Save the current file as the last opened file immediately
+            self.settings[SETTING_FILENAME] = self.file_path
+            self.settings.save()
 
             # Default : select last item if there is at least one item
             if self.label_list.count():
@@ -1441,6 +1461,13 @@ class MainWindow(QMainWindow, WindowMixin):
         for imgPath in self.m_img_list:
             item = QListWidgetItem(imgPath)
             self.file_list_widget.addItem(item)
+        self.update_progress_label()
+
+    def update_progress_label(self):
+        if self.img_count > 0:
+            self.prog_label.setText("Image: %d / %d" % (self.cur_img_idx + 1, self.img_count))
+        else:
+            self.prog_label.setText("Image: 0 / 0")
 
     def verify_image(self, _value=False):
         # Proceeding next image without dialog if having any label
@@ -1584,16 +1611,28 @@ class MainWindow(QMainWindow, WindowMixin):
     def delete_image(self):
         delete_path = self.file_path
         if delete_path is not None:
-            idx = self.cur_img_idx
-            if os.path.exists(delete_path):
-                os.remove(delete_path)
-            self.import_dir_images(self.last_open_dir)
-            if self.img_count > 0:
-                self.cur_img_idx = min(idx, self.img_count - 1)
-                filename = self.m_img_list[self.cur_img_idx]
-                self.load_file(filename)
-            else:
-                self.close_file()
+            yes, no = QMessageBox.Yes, QMessageBox.No
+            msg = "You are about to permanently delete this image file.\nAre you sure you want to delete\n%s?" % delete_path
+            if QMessageBox.warning(self, "Attention", msg, yes | no) == yes:
+                if os.path.exists(delete_path):
+                    os.remove(delete_path)
+
+                # Remove annotation file if exists
+                basename = os.path.splitext(os.path.basename(delete_path))[0]
+                save_dir = self.default_save_dir if self.default_save_dir else os.path.dirname(delete_path)
+                for ext in [".xml", ".txt", ".json"]:
+                    annotation_path = os.path.join(save_dir, basename + ext)
+                    if os.path.exists(annotation_path):
+                        os.remove(annotation_path)
+                        break
+
+                self.import_dir_images(self.last_open_dir)
+                if self.img_count > 0:
+                    self.cur_img_idx = min(self.cur_img_idx, self.img_count - 1)
+                    filename = self.m_img_list[self.cur_img_idx]
+                    self.load_file(filename)
+                else:
+                    self.close_file()
 
     def reset_all(self):
         self.settings.reset()
