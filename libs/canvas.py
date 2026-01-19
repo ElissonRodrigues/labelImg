@@ -95,7 +95,13 @@ class Canvas(QWidget):
         if not value:  # Create
             self.un_highlight()
             self.de_select_shape()
-        self.prev_point = QPointF()
+            self.override_cursor(CURSOR_DRAW)
+            # Set prev_point to current mouse position for immediate crosshair
+            widget_pos = self.mapFromGlobal(QCursor.pos())
+            self.prev_point = self.transform_pos(widget_pos)
+        else:
+            self.restore_cursor()
+            self.prev_point = QPointF()
         self.repaint()
 
     def un_highlight(self, shape=None):
@@ -627,11 +633,14 @@ class Canvas(QWidget):
 
     def keyPressEvent(self, ev):
         key = ev.key()
-        if key == Qt.Key_Escape and self.current:
-            print("ESC press")
-            self.current = None
-            self.drawingPolygon.emit(False)
-            self.update()
+        if key == Qt.Key_Escape:
+            if self.current:
+                self.current = None
+                self.drawingPolygon.emit(False)
+                self.update()
+            elif not self.editing():
+                self.drawingPolygon.emit(False)
+                self.update()
         elif key == Qt.Key_Return and self.can_close_shape():
             self.finalise()
         elif key == Qt.Key_Left and self.selected_shape:

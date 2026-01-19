@@ -225,10 +225,8 @@ class MainWindow(QMainWindow, WindowMixin):
         copy_prev_bounding = action(get_str("copyPrevBounding"), self.copy_previous_bounding_boxes, "Ctrl+v", "copy", get_str("copyPrevBounding"))
 
         open_next_image = action(get_str("nextImg"), self.open_next_image, "d", "next", get_str("nextImgDetail"))
-        open_next_image.setShortcuts(["d", "Right"])
 
         open_prev_image = action(get_str("prevImg"), self.open_prev_image, "a", "prev", get_str("prevImgDetail"))
-        open_prev_image.setShortcuts(["a", "Left"])
 
         verify = action(get_str("verifyImg"), self.verify_image, "space", "verify", get_str("verifyImgDetail"))
 
@@ -259,15 +257,18 @@ class MainWindow(QMainWindow, WindowMixin):
         close = action(get_str("closeCur"), self.close_file, "Ctrl+W", "close", get_str("closeCurDetail"))
 
         delete_image = action(get_str("deleteImg"), self.delete_image, "Ctrl+Shift+D", "close", get_str("deleteImgDetail"))
+        delete_image.setShortcuts(["Ctrl+Shift+D", "Ctrl+Shift+Delete"])
 
         reset_all = action(get_str("resetAll"), self.reset_all, None, "resetall", get_str("resetAllDetail"))
 
         color1 = action(get_str("boxLineColor"), self.choose_color1, "Ctrl+L", "color_line", get_str("boxLineColorDetail"))
 
         create_mode = action(get_str("crtBox"), self.set_create_mode, "w", "new", get_str("crtBoxDetail"), enabled=False)
+        create_mode.setShortcuts(["w", "Insert"])
         edit_mode = action(get_str("editBox"), self.set_edit_mode, "Ctrl+J", "edit", get_str("editBoxDetail"), enabled=False)
 
         create = action(get_str("crtBox"), self.create_shape, "w", "new", get_str("crtBoxDetail"), enabled=False)
+        create.setShortcuts(["w", "Insert"])
         delete = action(get_str("delBox"), self.delete_selected_shape, "Delete", "delete", get_str("delBoxDetail"), enabled=False)
         copy = action(get_str("dupBox"), self.copy_selected_shape, "Ctrl+D", "copy", get_str("dupBoxDetail"), enabled=False)
 
@@ -428,6 +429,10 @@ class MainWindow(QMainWindow, WindowMixin):
         self.display_label_option.setChecked(settings.get(SETTING_PAINT_LABEL, False))
         self.display_label_option.triggered.connect(self.toggle_paint_labels_option)
 
+        self.auto_scroll_option = QAction("Auto Scroll File List", self)
+        self.auto_scroll_option.setCheckable(True)
+        self.auto_scroll_option.setChecked(settings.get(SETTING_AUTO_SCROLL, True))
+
         add_actions(
             self.menus.file,
             (
@@ -453,6 +458,7 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.auto_saving,
                 self.single_class_mode,
                 self.display_label_option,
+                self.auto_scroll_option,
                 labels,
                 advanced_mode,
                 None,
@@ -791,8 +797,6 @@ class MainWindow(QMainWindow, WindowMixin):
         """In the middle of drawing, toggling between modes should be disabled."""
         self.actions.editMode.setEnabled(not drawing)
         if not drawing and self.beginner():
-            # Cancel creation.
-            print("Cancel creation.")
             self.canvas.set_editing(True)
             self.canvas.restore_cursor()
             self.actions.create.setEnabled(True)
@@ -1195,6 +1199,8 @@ class MainWindow(QMainWindow, WindowMixin):
                 index = self.m_img_list.index(unicode_file_path)
                 file_widget_item = self.file_list_widget.item(index)
                 file_widget_item.setSelected(True)
+                if self.auto_scroll_option.isChecked():
+                    self.file_list_widget.scrollToItem(file_widget_item)
                 self.cur_img_idx = index
                 self.update_progress_label()
             else:
@@ -1228,7 +1234,33 @@ class MainWindow(QMainWindow, WindowMixin):
             else:
                 image = QImage.fromData(self.image_data)
             if image.isNull():
-                self.error_message("Error opening file", "<p>Make sure <i>%s</i> is a valid image file." % unicode_file_path)
+                msg = QMessageBox()
+                msg.setIcon(QMessageBox.Critical)
+                msg.setText("Error opening file")
+                msg.setInformativeText("<p>Make sure <i>%s</i> is a valid image file.<br>Do you want to delete this file?</p>" % unicode_file_path)
+                msg.setWindowTitle("Error")
+                msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+                retval = msg.exec_()
+                if retval == QMessageBox.Yes:
+                    if os.path.exists(unicode_file_path):
+                        os.remove(unicode_file_path)
+
+                    img_name = os.path.splitext(os.path.basename(unicode_file_path))[0]
+                    for ext in [".xml", ".txt", ".json"]:
+                        f = os.path.join(os.path.dirname(unicode_file_path), img_name + ext)
+                        if os.path.exists(f):
+                            os.remove(f)
+                        if self.default_save_dir:
+                            f = os.path.join(self.default_save_dir, img_name + ext)
+                            if os.path.exists(f):
+                                os.remove(f)
+
+                    self.import_dir_images(self.last_open_dir)
+                    if self.img_count > 0:
+                        self.cur_img_idx = min(self.cur_img_idx, self.img_count - 1)
+                        self.load_file(self.m_img_list[self.cur_img_idx])
+                    return True
+
                 self.status("Error reading %s" % unicode_file_path)
                 return False
             self.status("Loaded %s" % os.path.basename(unicode_file_path))
@@ -1357,6 +1389,7 @@ class MainWindow(QMainWindow, WindowMixin):
         settings[SETTING_AUTO_SAVE] = self.auto_saving.isChecked()
         settings[SETTING_SINGLE_CLASS] = self.single_class_mode.isChecked()
         settings[SETTING_PAINT_LABEL] = self.display_label_option.isChecked()
+        settings[SETTING_AUTO_SCROLL] = self.auto_scroll_option.isChecked()
         settings[SETTING_DRAW_SQUARE] = self.draw_squares_option.isChecked()
         settings[SETTING_LABEL_FILE_FORMAT] = self.label_file_format
         settings.save()
@@ -1532,10 +1565,13 @@ class MainWindow(QMainWindow, WindowMixin):
             return
 
         filename = None
-        if self.file_path is None:
+        if self.file_path is None and getattr(self, "cur_img_idx", None) is None:
             filename = self.m_img_list[0]
             self.cur_img_idx = 0
         else:
+            if not hasattr(self, "cur_img_idx"):
+                self.cur_img_idx = 0
+
             if self.cur_img_idx + 1 < self.img_count:
                 self.cur_img_idx += 1
                 filename = self.m_img_list[self.cur_img_idx]
