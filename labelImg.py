@@ -1300,6 +1300,8 @@ class MainWindow(QMainWindow, WindowMixin):
         return "[{} / {}]".format(self.cur_img_idx + 1, self.img_count)
 
     def show_bounding_box_from_annotation_file(self, file_path):
+        if file_path is None:
+            return
         if self.default_save_dir is not None:
             basename = os.path.basename(os.path.splitext(file_path)[0])
             xml_path = os.path.join(self.default_save_dir, basename + XML_EXT)
@@ -1426,7 +1428,8 @@ class MainWindow(QMainWindow, WindowMixin):
         if dir_path is not None and len(dir_path) > 1:
             self.default_save_dir = dir_path
 
-        self.show_bounding_box_from_annotation_file(self.file_path)
+        if self.file_path:
+            self.show_bounding_box_from_annotation_file(self.file_path)
 
         self.statusBar().showMessage("%s . Annotation will be saved to %s" % ("Change saved folder", self.default_save_dir))
         self.statusBar().show()
