@@ -44,3 +44,13 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 labelImg = ["data/predefined_classes.txt", "resources/**/*"]
+
+[tool.uv]
+# Required for cross-platform compatibility - ensures uv picks package versions
+# that have wheels available for all these platforms
+required-environments = [
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+]

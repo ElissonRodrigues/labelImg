@@ -2,9 +2,18 @@ version = 1
 revision = 3
 requires-python = ">=3.8"
 resolution-markers = [
-    "python_full_version >= '3.10'",
-    "python_full_version == '3.9.*'",
-    "python_full_version < '3.9'",
+    "(python_full_version >= '3.10' and platform_machine != 'AMD64') or (python_full_version >= '3.10' and sys_platform != 'win32')",
+    "(python_full_version == '3.9.*' and platform_machine != 'AMD64') or (python_full_version == '3.9.*' and sys_platform != 'win32')",
+    "(python_full_version < '3.9' and platform_machine != 'AMD64') or (python_full_version < '3.9' and sys_platform != 'win32')",
+    "python_full_version >= '3.10' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.9.*' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version < '3.9' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+]
+required-markers = [
+    "platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "platform_machine == 'x86_64' and sys_platform == 'darwin'",
+    "platform_machine == 'arm64' and sys_platform == 'darwin'",
 ]
 
 [[package]]
@@ -174,7 +183,8 @@ name = "pyqt5"
 version = "5.15.11"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyqt5-qt5" },
+    { name = "pyqt5-qt5", version = "5.15.2", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine == 'AMD64' and sys_platform == 'win32'" },
+    { name = "pyqt5-qt5", version = "5.15.18", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'AMD64' or sys_platform != 'win32'" },
     { name = "pyqt5-sip", version = "12.15.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "pyqt5-sip", version = "12.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.9.*'" },
     { name = "pyqt5-sip", version = "12.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
@@ -190,8 +200,26 @@ wheels = [
 
 [[package]]
 name = "pyqt5-qt5"
+version = "5.15.2"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.10' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version == '3.9.*' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "python_full_version < '3.9' and platform_machine == 'AMD64' and sys_platform == 'win32'",
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/37/97/5d3b222b924fa2ed4c2488925155cd0b03fd5d09ee1cfcf7c553c11c9f66/PyQt5_Qt5-5.15.2-py3-none-win_amd64.whl", hash = "sha256:750b78e4dba6bdf1607febedc08738e318ea09e9b10aea9ff0d73073f11f6962", size = 50075158, upload-time = "2021-03-10T14:05:20.868Z" },
+]
+
+[[package]]
+name = "pyqt5-qt5"
 version = "5.15.18"
 source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "(python_full_version >= '3.10' and platform_machine != 'AMD64') or (python_full_version >= '3.10' and sys_platform != 'win32')",
+    "(python_full_version == '3.9.*' and platform_machine != 'AMD64') or (python_full_version == '3.9.*' and sys_platform != 'win32')",
+    "(python_full_version < '3.9' and platform_machine != 'AMD64') or (python_full_version < '3.9' and sys_platform != 'win32')",
+]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/46/90/bf01ac2132400997a3474051dd680a583381ebf98b2f5d64d4e54138dc42/pyqt5_qt5-5.15.18-py3-none-macosx_10_13_x86_64.whl", hash = "sha256:8bb997eb903afa9da3221a0c9e6eaa00413bbeb4394d5706118ad05375684767", size = 39715743, upload-time = "2025-11-09T12:56:42.936Z" },
     { url = "https://files.pythonhosted.org/packages/24/8e/76366484d9f9dbe28e3bdfc688183433a7b82e314216e9b14c89e5fab690/pyqt5_qt5-5.15.18-py3-none-macosx_11_0_arm64.whl", hash = "sha256:c656af9c1e6aaa7f59bf3d8995f2fa09adbf6762b470ed284c31dca80d686a26", size = 36798484, upload-time = "2025-11-09T12:56:59.998Z" },
@@ -203,7 +231,8 @@ name = "pyqt5-sip"
 version = "12.15.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version < '3.9'",
+    "(python_full_version < '3.9' and platform_machine != 'AMD64') or (python_full_version < '3.9' and sys_platform != 'win32')",
+    "python_full_version < '3.9' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1b/15/78318d50f10062c428e97e7ce387e772616a4673c356018b905f247a6a85/PyQt5_sip-12.15.0.tar.gz", hash = "sha256:d23fdfcf363b5cedd9d39f8a9c5710e7d52804f5b08a58e91c638b36eafcb702", size = 104024, upload-time = "2024-07-12T15:38:08.283Z" }
 wheels = [
@@ -234,7 +263,8 @@ name = "pyqt5-sip"
 version = "12.17.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version == '3.9.*'",
+    "(python_full_version == '3.9.*' and platform_machine != 'AMD64') or (python_full_version == '3.9.*' and sys_platform != 'win32')",
+    "python_full_version == '3.9.*' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ea/08/88a20c862f40b5c178c517cdc7e93767967dec5ac1b994e226d517991c9b/pyqt5_sip-12.17.1.tar.gz", hash = "sha256:0eab72bcb628f1926bf5b9ac51259d4fa18e8b2a81d199071135458f7d087ea8", size = 104136, upload-time = "2025-10-08T09:04:19.893Z" }
 wheels = [
@@ -269,7 +299,8 @@ name = "pyqt5-sip"
 version = "12.18.0"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version >= '3.10'",
+    "(python_full_version >= '3.10' and platform_machine != 'AMD64') or (python_full_version >= '3.10' and sys_platform != 'win32')",
+    "python_full_version >= '3.10' and platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f3/31/5ef342de9faee0f3801088946ae103db9b9eaeba3d6a64fefd5ce74df244/pyqt5_sip-12.18.0.tar.gz", hash = "sha256:71c37db75a0664325de149f43e2a712ec5fa1f90429a21dafbca005cb6767f94", size = 104143, upload-time = "2026-01-13T15:53:19.576Z" }
 wheels = [
