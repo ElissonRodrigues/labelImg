@@ -1665,7 +1665,7 @@ class MainWindow(QMainWindow, WindowMixin):
                         os.remove(annotation_path)
                         break
 
-                self.import_dir_images(self.last_open_dir)
+                self.import_dir_images(self.last_open_dir, load_first=False)
                 if self.img_count > 0:
                     self.cur_img_idx = min(self.cur_img_idx, self.img_count - 1)
                     filename = self.m_img_list[self.cur_img_idx]

@@ -47,3 +47,5 @@ tmp.*
 venv/
 .python-version
 
+# UV lock file (each platform generates its own)
+uv.lock
