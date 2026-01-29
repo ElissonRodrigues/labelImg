@@ -1,16 +1,15 @@
 from math import sqrt
-from libs.ustr import ustr
 import hashlib
 import re
 import sys
 
-from PyQt6.QtGui import *
-from PyQt6.QtCore import *
-from PyQt6.QtWidgets import *
+from PyQt6.QtGui import QIcon, QAction, QRegularExpressionValidator, QColor
+from PyQt6.QtCore import QRegularExpression
+from PyQt6.QtWidgets import QPushButton, QMenu
 
 
 def new_icon(icon):
-    return QIcon(":/" + icon)
+    return QIcon(f":/{icon}")
 
 
 def new_button(text, icon=None, slot=None):
@@ -78,11 +77,11 @@ def distance(p):
 
 def format_shortcut(text):
     mod, key = text.split("+", 1)
-    return "<b>%s</b>+<b>%s</b>" % (mod, key)
+    return f"<b>{mod}</b>+<b>{key}</b>"
 
 
 def generate_color_by_text(text):
-    s = ustr(text)
+    s = text
     hash_code = int(hashlib.sha256(s.encode("utf-8")).hexdigest(), 16)
     r = int((hash_code / 255) % 255)
     g = int((hash_code / 65025) % 255)

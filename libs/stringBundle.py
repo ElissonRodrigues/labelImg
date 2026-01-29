@@ -9,9 +9,8 @@ import re
 import os
 import sys
 import locale
-from libs.ustr import ustr
 
-from PyQt6.QtCore import *
+from PyQt6.QtCore import QFile, QIODevice, QTextStream, QStringConverter
 
 
 class StringBundle:
@@ -36,14 +35,14 @@ class StringBundle:
                     if locale.getdefaultlocale() and len(locale.getdefaultlocale()) > 0
                     else os.getenv("LANG")
                 )
-            except:
+            except Exception:
                 print("Invalid locale")
                 locale_str = "en"
 
         return StringBundle(cls.__create_key, locale_str)
 
     def get_string(self, string_id):
-        assert string_id in self.id_to_message, "Missing string id : " + string_id
+        assert string_id in self.id_to_message, f"Missing string id : {string_id}"
         return self.id_to_message[string_id]
 
     def __create_lookup_fallback_list(self, locale_str):
@@ -55,7 +54,7 @@ class StringBundle:
             tags = re.split("[^a-zA-Z]", locale_str)
             for tag in tags:
                 last_path = result_paths[-1]
-                result_paths.append(last_path + "-" + tag)
+                result_paths.append(f"{last_path}-{tag}")
 
         return result_paths
 
@@ -68,7 +67,7 @@ class StringBundle:
                 text.setEncoding(QStringConverter.Encoding.Utf8)
 
             while not text.atEnd():
-                line = ustr(text.readLine())
+                line = text.readLine()
                 key_value = line.split(PROP_SEPERATOR)
                 key = key_value[0].strip()
                 value = PROP_SEPERATOR.join(key_value[1:]).strip().strip('"')

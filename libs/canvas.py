@@ -1,6 +1,7 @@
-from PyQt6.QtGui import *
-from PyQt6.QtCore import *
-from PyQt6.QtWidgets import *
+from PyQt6.QtGui import QColor, QCursor, QPixmap, QPainter, QPen, QPainterPath, QBrush
+from PyQt6.QtCore import Qt, pyqtSignal, QPointF, QPoint
+from PyQt6.QtWidgets import QWidget, QMenu, QApplication
+
 
 from libs.shape import Shape
 from libs.utils import distance
@@ -26,7 +27,7 @@ class Canvas(QWidget):
     epsilon = 24.0
 
     def __init__(self, *args, **kwargs):
-        super(Canvas, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         # Initialise local state.
         self.mode = self.EDIT
         self.shapes = []
@@ -113,7 +114,7 @@ class Canvas(QWidget):
         window = self.parent().window()
         if window.file_path is not None:
             self.parent().window().label_coordinates.setText(
-                "X: %d; Y: %d" % (pos.x(), pos.y())
+                f"X: {pos.x():.0f}; Y: {pos.y():.0f}"
             )
 
         # Polygon drawing.
@@ -246,7 +247,7 @@ class Canvas(QWidget):
                 if self.selected_vertex():
                     self.h_shape.highlight_clear()
                 self.h_vertex, self.h_shape = None, shape
-                self.setToolTip("Click & drag to move shape '%s'" % shape.label)
+                self.setToolTip(f"Click & drag to move shape '{shape.label}'")
                 self.setStatusTip(self.toolTip())
                 self.override_cursor(CURSOR_GRAB)
                 self.update()
@@ -518,7 +519,7 @@ class Canvas(QWidget):
 
     def paintEvent(self, event):
         if not self.pixmap:
-            return super(Canvas, self).paintEvent(event)
+            return super().paintEvent(event)
 
         p = self._painter
         p.begin(self)
@@ -600,7 +601,7 @@ class Canvas(QWidget):
 
     def offset_to_center(self):
         s = self.scale
-        area = super(Canvas, self).size()
+        area = super().size()
         w, h = self.pixmap.width() * s, self.pixmap.height() * s
         aw, ah = area.width(), area.height()
         x = (aw - w) / (2 * s) if aw > w else 0
@@ -640,7 +641,7 @@ class Canvas(QWidget):
     def minimumSizeHint(self):
         if self.pixmap:
             return self.scale * self.pixmap.size()
-        return super(Canvas, self).minimumSizeHint()
+        return super().minimumSizeHint()
 
     def wheelEvent(self, ev):
         delta = ev.angleDelta()
@@ -684,37 +685,26 @@ class Canvas(QWidget):
             self.move_one_pixel("Down")
 
     def move_one_pixel(self, direction):
-        # print(self.selectedShape.points)
-        if direction == "Left" and not self.move_out_of_bound(QPointF(-1.0, 0)):
-            # print("move Left one pixel")
-            self.selected_shape.points[0] += QPointF(-1.0, 0)
-            self.selected_shape.points[1] += QPointF(-1.0, 0)
-            self.selected_shape.points[2] += QPointF(-1.0, 0)
-            self.selected_shape.points[3] += QPointF(-1.0, 0)
-        elif direction == "Right" and not self.move_out_of_bound(QPointF(1.0, 0)):
-            # print("move Right one pixel")
-            self.selected_shape.points[0] += QPointF(1.0, 0)
-            self.selected_shape.points[1] += QPointF(1.0, 0)
-            self.selected_shape.points[2] += QPointF(1.0, 0)
-            self.selected_shape.points[3] += QPointF(1.0, 0)
-        elif direction == "Up" and not self.move_out_of_bound(QPointF(0, -1.0)):
-            # print("move Up one pixel")
-            self.selected_shape.points[0] += QPointF(0, -1.0)
-            self.selected_shape.points[1] += QPointF(0, -1.0)
-            self.selected_shape.points[2] += QPointF(0, -1.0)
-            self.selected_shape.points[3] += QPointF(0, -1.0)
-        elif direction == "Down" and not self.move_out_of_bound(QPointF(0, 1.0)):
-            # print("move Down one pixel")
-            self.selected_shape.points[0] += QPointF(0, 1.0)
-            self.selected_shape.points[1] += QPointF(0, 1.0)
-            self.selected_shape.points[2] += QPointF(0, 1.0)
-            self.selected_shape.points[3] += QPointF(0, 1.0)
+        match direction:
+            case "Left" if not self.move_out_of_bound(QPointF(-1.0, 0)):
+                step = QPointF(-1.0, 0)
+            case "Right" if not self.move_out_of_bound(QPointF(1.0, 0)):
+                step = QPointF(1.0, 0)
+            case "Up" if not self.move_out_of_bound(QPointF(0, -1.0)):
+                step = QPointF(0, -1.0)
+            case "Down" if not self.move_out_of_bound(QPointF(0, 1.0)):
+                step = QPointF(0, 1.0)
+            case _:
+                return
+
+        for i in range(4):
+            self.selected_shape.points[i] += step
         self.shapeMoved.emit()
         self.repaint()
 
     def move_out_of_bound(self, step):
         points = [p1 + p2 for p1, p2 in zip(self.selected_shape.points, [step] * 4)]
-        return True in map(self.out_of_pixmap, points)
+        return any(self.out_of_pixmap(p) for p in points)
 
     def set_last_label(self, text, line_color=None, fill_color=None):
         assert text
