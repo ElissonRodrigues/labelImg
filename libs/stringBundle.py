@@ -11,13 +11,7 @@ import sys
 import locale
 from libs.ustr import ustr
 
-try:
-    from PyQt5.QtCore import *
-except ImportError:
-    if sys.version_info.major >= 3:
-        import sip
-        sip.setapi('QVariant', 2)
-    from PyQt4.QtCore import *
+from PyQt6.QtCore import *
 
 
 class StringBundle:
@@ -25,7 +19,9 @@ class StringBundle:
     __create_key = object()
 
     def __init__(self, create_key, locale_str):
-        assert(create_key == StringBundle.__create_key), "StringBundle must be created using StringBundle.getBundle"
+        assert (
+            create_key == StringBundle.__create_key
+        ), "StringBundle must be created using StringBundle.getBundle"
         self.id_to_message = {}
         paths = self.__create_lookup_fallback_list(locale_str)
         for path in paths:
@@ -35,16 +31,19 @@ class StringBundle:
     def get_bundle(cls, locale_str=None):
         if locale_str is None:
             try:
-                locale_str = locale.getdefaultlocale()[0] if locale.getdefaultlocale() and len(
-                    locale.getdefaultlocale()) > 0 else os.getenv('LANG')
+                locale_str = (
+                    locale.getdefaultlocale()[0]
+                    if locale.getdefaultlocale() and len(locale.getdefaultlocale()) > 0
+                    else os.getenv("LANG")
+                )
             except:
-                print('Invalid locale')
-                locale_str = 'en'
+                print("Invalid locale")
+                locale_str = "en"
 
         return StringBundle(cls.__create_key, locale_str)
 
     def get_string(self, string_id):
-        assert(string_id in self.id_to_message), "Missing string id : " + string_id
+        assert string_id in self.id_to_message, "Missing string id : " + string_id
         return self.id_to_message[string_id]
 
     def __create_lookup_fallback_list(self, locale_str):
@@ -53,20 +52,20 @@ class StringBundle:
         result_paths.append(base_path)
         if locale_str is not None:
             # Don't follow standard BCP47. Simple fallback
-            tags = re.split('[^a-zA-Z]', locale_str)
+            tags = re.split("[^a-zA-Z]", locale_str)
             for tag in tags:
                 last_path = result_paths[-1]
-                result_paths.append(last_path + '-' + tag)
+                result_paths.append(last_path + "-" + tag)
 
         return result_paths
 
     def __load_bundle(self, path):
-        PROP_SEPERATOR = '='
+        PROP_SEPERATOR = "="
         f = QFile(path)
         if f.exists():
-            if f.open(QIODevice.ReadOnly | QFile.Text):
+            if f.open(QIODevice.OpenModeFlag.ReadOnly | QIODevice.OpenModeFlag.Text):
                 text = QTextStream(f)
-                text.setCodec("UTF-8")
+                text.setEncoding(QStringConverter.Encoding.Utf8)
 
             while not text.atEnd():
                 line = ustr(text.readLine())

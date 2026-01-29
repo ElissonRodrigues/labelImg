@@ -12,11 +12,11 @@ jobs:
       - name: Setup Python Environment
         run: |
           pip3 install pipenv
-          pipenv install pyqt5 lxml
-          pipenv run pip install pyqt5==5.15.6 lxml
+          pipenv install pyqt6 lxml
+          pipenv run pip install pyqt6 lxml
       - name: Build LabelImg
         run: |
-          pipenv run make qt5py3
+          # pyrcc is handled by the app initialization in PyQt6 if needed
           rm -rf build dist
       - name: Package LabelImg
         run: |
@@ -36,13 +36,14 @@ jobs:
       - uses: actions/checkout@v3
       - name: Setup Python Environment
         run: |
-          pip3 install pyinstaller pyqt5==5.15.6 lxml
+          pip3 install pyinstaller pyqt6 lxml
       - name: Build LabelImg
         run: |
-          pyrcc5 -o libs/resources.py resources.qrc
+          # Resource compilation is handled within the app
+          echo "Building..."
       - name: Package LabelImg
         run: |
-          pyinstaller --hidden-import=pyqt5 --hidden-import=lxml -F -n "labelImg" -c labelImg.py -p ./libs -p ./
+          pyinstaller --hidden-import=PyQt6 --hidden-import=lxml -F -n "labelImg" -c labelImg.py -p ./libs -p ./
       - uses: actions/upload-artifact@v3
         with:
           name: Windows artifact
@@ -53,14 +54,16 @@ jobs:
       - uses: actions/checkout@v3
       - name: Setup Python Environment
         run: |
-          pip3 install pyinstaller pyqt5==5.15.6 lxml
+          pip3 install pyinstaller pyqt6 lxml
       - name: Build LabelImg
         run: |
-          pyrcc5 -o libs/resources.py resources.qrc
+          # Resource compilation is handled within the app
+          echo "Building..."
       - name: Package LabelImg
         run: |
-          pyinstaller --hidden-import=pyqt5 --hidden-import=lxml -F -n "labelImg" -c labelImg.py -p ./libs -p ./
+          pyinstaller --hidden-import=PyQt6 --hidden-import=lxml -F -n "labelImg" -c labelImg.py -p ./libs -p ./
       - uses: actions/upload-artifact@v3
         with:
           name: Linux artifact
           path: dist/labelImg
+

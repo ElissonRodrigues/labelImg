@@ -38,7 +38,7 @@ LabelImg 是影像標註工具，它是用python 和 QT 寫成的.
 透過編譯原始碼
 ~~~~~~~~~~~~~~~~~
 
-Linux/Ubuntu/Mac 需要 Python 和 `PyQt <https://pypi.org/project/PyQt5/>`__
+Linux/Ubuntu/Mac 需要 Python 和 `PyQt <https://pypi.org/project/PyQt6/>`__
 
 Ubuntu Linux
 ^^^^^^^^^^^^
@@ -47,7 +47,7 @@ Python 3 + Qt5
 
 .. code:: shell
 
-    sudo apt-get install pyqt5-dev-tools
+    sudo apt-get install pyqt6-dev-tools
     sudo pip3 install -r requirements/requirements-linux-python3.txt
     make qt5py3
     python3 labelImg.py
@@ -65,7 +65,7 @@ Python 3 + Qt5
 
     or using pip
 
-    pip3 install pyqt5 lxml # Install qt and lxml by pip
+    pip3 install pyqt6 lxml # Install qt and lxml by pip
 
     make qt5py3
     python3 labelImg.py
@@ -80,7 +80,7 @@ Virtualenv 可以避免版本和相依性問題
 
     brew install python3
     pip3 install pipenv
-    pipenv run pip install pyqt5==5.15.2 lxml
+    pipenv run pip install pyqt6==5.15.2 lxml
     pipenv run make qt5py3
     pipenv run python3 labelImg.py
     [Optional] rm -rf build dist; python setup.py py2app -A;mv "dist/labelImg.app" /Applications
@@ -90,7 +90,7 @@ Windows
 ^^^^^^^
 
 安裝 `Python <https://www.python.org/downloads/windows/>`__,
-`PyQt5 <https://www.riverbankcomputing.com/software/pyqt/download5>`__
+`PyQt6 <https://www.riverbankcomputing.com/software/pyqt/download5>`__
 和 `install lxml <http://lxml.de/installation.html>`__.
 
 安裝並到 `labelImg <#labelimg>`__ 目錄
@@ -98,7 +98,7 @@ Windows
 .. code:: shell
 
     pyrcc4 -o libs/resources.py resources.qrc
-    For pyqt5, pyrcc5 -o libs/resources.py resources.qrc
+    For pyqt6, pyside6-rcc -o libs/resources.py resources.qrc
 
     python labelImg.py
     python labelImg.py [IMAGE_PATH] [PRE-DEFINED CLASS FILE]
@@ -114,7 +114,7 @@ Windows + Anaconda
 
     conda install pyqt=5
     conda install -c anaconda lxml
-    pyrcc5 -o libs/resources.py resources.qrc
+    pyside6-rcc -o libs/resources.py resources.qrc
     python labelImg.py
     python labelImg.py [IMAGE_PATH] [PRE-DEFINED CLASS FILE]
 

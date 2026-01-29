@@ -48,7 +48,7 @@ Python 3とQt5を使う場合
 
 .. code:: shell
 
-    sudo apt-get install pyqt5-dev-tools
+    sudo apt-get install pyqt6-dev-tools
     sudo pip3 install -r requirements/requirements-linux-python3.txt
     make qt5py3
     python3 labelImg.py
@@ -66,7 +66,7 @@ Python 3とQt5を使う場合
 
     or using pip
 
-    pip3 install pyqt5 lxml # Install qt and lxml by pip
+    pip3 install pyqt6 lxml # Install qt and lxml by pip
 
     make qt5py3
     python3 labelImg.py
@@ -81,7 +81,7 @@ VirtualenvはQtとPythonのバージョン衝突問題を解消できます。
 
     brew install python3
     pip3 install pipenv
-    pipenv run pip install pyqt5==5.15.2 lxml
+    pipenv run pip install pyqt6==5.15.2 lxml
     pipenv run make qt5py3
     pipenv run python3 labelImg.py
     [任意で] rm -rf build dist; python setup.py py2app -A;mv "dist/labelImg.app" /Applications
@@ -94,7 +94,7 @@ Windowsの場合
 ^^^^^^^^^^^^^
 
 最初に`Python <https://www.python.org/downloads/windows/>`__ と
-`PyQt5 <https://www.riverbankcomputing.com/software/pyqt/download5>`__ と
+`PyQt6 <https://www.riverbankcomputing.com/software/pyqt/download5>`__ と
 `install lxml <http://lxml.de/installation.html>`__ をインストールしてください。
 
 コマンドプロンプトを起動し `labelImg <#labelimg>`__ がインストールされているフォルダに移動してから以下のコマンドを実行します。
@@ -102,7 +102,7 @@ Windowsの場合
 .. code:: shell
 
     pyrcc4 -o libs/resources.py resources.qrc
-    （pyqt5の場合は、 pyrcc5 -o libs/resources.py resources.qrc）
+    （pyqt6の場合は、 pyside6-rcc -o libs/resources.py resources.qrc）
 
     python labelImg.py
     python labelImg.py [画像パス] [定義済みクラスファイル]
@@ -118,7 +118,7 @@ Anaconda Promptを起動し `labelImg <#labelimg>`__ インストールされて
 
     conda install pyqt=5
     conda install -c anaconda lxml
-    pyrcc5 -o libs/resources.py resources.qrc
+    pyside6-rcc -o libs/resources.py resources.qrc
     python labelImg.py
     python labelImg.py [IMAGE_PATH] [PRE-DEFINED CLASS FILE]
 

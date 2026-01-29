@@ -22,9 +22,11 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "pyqt5>=5.14",
+    "PyQt6",
+    "PySide6",
     "lxml>=4.9",
 ]
+
 
 [project.urls]
 Homepage = "https://github.com/tzutalin/labelImg"
