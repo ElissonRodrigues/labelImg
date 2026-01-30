@@ -151,18 +151,36 @@ class PascalVocReader:
         return self.shapes
 
     def add_shape(self, label, bnd_box, difficult):
-        x_min = int(float(bnd_box.find("xmin").text))
-        y_min = int(float(bnd_box.find("ymin").text))
-        x_max = int(float(bnd_box.find("xmax").text))
-        y_max = int(float(bnd_box.find("ymax").text))
-        points = [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]
-        self.shapes.append((label, points, None, None, difficult))
+        if bnd_box is None:
+            return
+
+        xmin_elem = bnd_box.find("xmin")
+        ymin_elem = bnd_box.find("ymin")
+        xmax_elem = bnd_box.find("xmax")
+        ymax_elem = bnd_box.find("ymax")
+
+        if (
+            xmin_elem is not None
+            and xmin_elem.text
+            and ymin_elem is not None
+            and ymin_elem.text
+            and xmax_elem is not None
+            and xmax_elem.text
+            and ymax_elem is not None
+            and ymax_elem.text
+        ):
+            x_min = int(float(xmin_elem.text))
+            y_min = int(float(ymin_elem.text))
+            x_max = int(float(xmax_elem.text))
+            y_max = int(float(ymax_elem.text))
+            points = [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]
+            self.shapes.append((label, points, None, None, difficult))
 
     def parse_xml(self):
         assert self.file_path.endswith(XML_EXT), "Unsupported file format"
         parser = etree.XMLParser(encoding=ENCODE_METHOD)
         xml_tree = ElementTree.parse(self.file_path, parser=parser).getroot()
-        filename = xml_tree.find("filename").text
+        # filename = xml_tree.find("filename").text  # Unused and potentially None
         try:
             verified = xml_tree.attrib["verified"]
             if verified == "yes":
@@ -171,11 +189,15 @@ class PascalVocReader:
             self.verified = False
 
         for object_iter in xml_tree.findall("object"):
+            label_elem = object_iter.find("name")
+            label = label_elem.text if label_elem is not None else "Unknown"
+
             bnd_box = object_iter.find("bndbox")
-            label = object_iter.find("name").text
-            # Add chris
+
             difficult = False
-            if object_iter.find("difficult") is not None:
-                difficult = bool(int(object_iter.find("difficult").text))
+            difficult_elem = object_iter.find("difficult")
+            if difficult_elem is not None and difficult_elem.text:
+                difficult = bool(int(difficult_elem.text))
+
             self.add_shape(label, bnd_box, difficult)
         return True

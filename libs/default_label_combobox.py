@@ -10,7 +10,10 @@ class DefaultLabelComboBox(QWidget):
         self.items = items
         self.cb.addItems(self.items)
 
-        self.cb.currentIndexChanged.connect(parent.default_label_combo_selection_changed)
+        if parent and hasattr(parent, "default_label_combo_selection_changed"):
+            self.cb.currentIndexChanged.connect(
+                parent.default_label_combo_selection_changed
+            )
 
         layout.addWidget(self.cb)
         self.setLayout(layout)

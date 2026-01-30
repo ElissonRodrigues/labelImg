@@ -23,7 +23,7 @@ class ToolBar(QToolBar):
 class ToolButton(QToolButton):
     """ToolBar companion class which ensures all buttons have the same size."""
 
-    minSize = (60, 60)
+    minSize: tuple[int, int] = (60, 60)
 
     def minimumSizeHint(self):
         ms = super(ToolButton, self).minimumSizeHint()

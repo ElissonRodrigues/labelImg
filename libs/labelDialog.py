@@ -12,13 +12,14 @@ from PyQt6.QtWidgets import (
 
 from libs.utils import new_icon, label_validator, trimmed
 
-BB = QDialogButtonBox
-
 
 class LabelDialog(QDialog):
 
     def __init__(self, text="Enter object label", parent=None, list_item=None):
-        super(LabelDialog, self).__init__(parent)
+        super().__init__(parent)
+
+        if list_item is None:
+            list_item = []
 
         self.edit = QLineEdit()
         self.edit.setText(text)
@@ -31,18 +32,24 @@ class LabelDialog(QDialog):
         completer.setModel(model)
         self.edit.setCompleter(completer)
 
-        self.button_box = bb = BB(
-            BB.StandardButton.Ok | BB.StandardButton.Cancel,
+        self.button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
             Qt.Orientation.Horizontal,
             self,
         )
-        bb.button(BB.StandardButton.Ok).setIcon(new_icon("done"))
-        bb.button(BB.StandardButton.Cancel).setIcon(new_icon("undo"))
-        bb.accepted.connect(self.validate)
-        bb.rejected.connect(self.reject)
+        ok_btn = self.button_box.button(QDialogButtonBox.StandardButton.Ok)
+        if ok_btn:
+            ok_btn.setIcon(new_icon("done"))
+
+        cancel_btn = self.button_box.button(QDialogButtonBox.StandardButton.Cancel)
+        if cancel_btn:
+            cancel_btn.setIcon(new_icon("undo"))
+
+        self.button_box.accepted.connect(self.validate)
+        self.button_box.rejected.connect(self.reject)
 
         layout = QVBoxLayout()
-        layout.addWidget(bb, alignment=Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(self.button_box, alignment=Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(self.edit)
 
         if list_item is not None and len(list_item) > 0:
@@ -75,30 +82,34 @@ class LabelDialog(QDialog):
             cursor_pos = QCursor.pos()
 
             # move OK button below cursor
-            btn = self.button_box.buttons()[0]
-            self.adjustSize()
-            btn.adjustSize()
-            offset = btn.mapToGlobal(btn.pos()) - self.pos()
-            offset += QPoint(btn.size().width() // 4, btn.size().height() // 2)
-            cursor_pos.setX(max(0, cursor_pos.x() - offset.x()))
-            cursor_pos.setY(max(0, cursor_pos.y() - offset.y()))
+            buttons = self.button_box.buttons()
+            if buttons:
+                btn = buttons[0]
+                self.adjustSize()
+                btn.adjustSize()
+                offset = btn.mapToGlobal(btn.pos()) - self.pos()
+                offset += QPoint(btn.size().width() // 4, btn.size().height() // 2)
+                cursor_pos.setX(max(0, cursor_pos.x() - offset.x()))
+                cursor_pos.setY(max(0, cursor_pos.y() - offset.y()))
 
-            parent_bottom_right = self.parentWidget().geometry()
-            max_x = (
-                parent_bottom_right.x()
-                + parent_bottom_right.width()
-                - self.sizeHint().width()
-            )
-            max_y = (
-                parent_bottom_right.y()
-                + parent_bottom_right.height()
-                - self.sizeHint().height()
-            )
-            max_global = self.parentWidget().mapToGlobal(QPoint(max_x, max_y))
-            if cursor_pos.x() > max_global.x():
-                cursor_pos.setX(max_global.x())
-            if cursor_pos.y() > max_global.y():
-                cursor_pos.setY(max_global.y())
+            parent = self.parentWidget()
+            if parent:
+                parent_bottom_right = parent.geometry()
+                max_x = (
+                    parent_bottom_right.x()
+                    + parent_bottom_right.width()
+                    - self.sizeHint().width()
+                )
+                max_y = (
+                    parent_bottom_right.y()
+                    + parent_bottom_right.height()
+                    - self.sizeHint().height()
+                )
+                max_global = parent.mapToGlobal(QPoint(max_x, max_y))
+                if cursor_pos.x() > max_global.x():
+                    cursor_pos.setX(max_global.x())
+                if cursor_pos.y() > max_global.y():
+                    cursor_pos.setY(max_global.y())
             self.move(cursor_pos)
         return trimmed(self.edit.text()) if self.exec() else None
 
