@@ -7,6 +7,8 @@ from PyQt6.QtGui import QColor, QPen, QPainterPath, QFont
 
 from libs.utils import distance
 import sys
+import uuid
+import json
 
 DEFAULT_LINE_COLOR = QColor(0, 255, 0, 128)
 DEFAULT_FILL_COLOR = QColor(255, 0, 0, 128)
@@ -56,6 +58,17 @@ class Shape(object):
             # with an object attribute. Currently this
             # is used for drawing the pending line a different color.
             self.line_color = line_color
+
+        self.uuid = str(uuid.uuid4())
+
+    def to_data(self):
+        return {
+            "uuid": self.uuid,
+            "label": self.label,
+            "points": [(p.x(), p.y()) for p in self.points],
+            "difficult": self.difficult,
+            # Colors are transient usually, but can be saved if needed
+        }
 
     def close(self):
         self._closed = True

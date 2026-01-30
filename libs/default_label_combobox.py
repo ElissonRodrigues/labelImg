@@ -17,3 +17,20 @@ class DefaultLabelComboBox(QWidget):
 
         layout.addWidget(self.cb)
         self.setLayout(layout)
+
+    def update_items(self, items):
+        if self.items == items:
+            return
+
+        current_text = self.cb.currentText()
+        self.cb.blockSignals(True)
+        self.cb.clear()
+        self.items = items
+        self.cb.addItems(self.items)
+
+        # Restore previous selection if it's still available
+        if current_text in self.items:
+            index = self.cb.findText(current_text)
+            self.cb.setCurrentIndex(index)
+
+        self.cb.blockSignals(False)

@@ -25,6 +25,7 @@ dependencies = [
     "PyQt6",
     "PySide6",
     "lxml>=4.9",
+    "sqlalchemy>=2.0.46",
 ]
 
 

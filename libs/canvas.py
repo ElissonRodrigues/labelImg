@@ -1,10 +1,11 @@
 from PyQt6.QtGui import QColor, QCursor, QPixmap, QPainter, QBrush
-from PyQt6.QtCore import Qt, pyqtSignal, QPointF, QPoint
+from PyQt6.QtCore import Qt, pyqtSignal, QPointF, QPoint, QRectF, QLineF
 from PyQt6.QtWidgets import QWidget, QMenu, QApplication
 
 
 from libs.shape import Shape
 from libs.utils import distance
+from libs.undo_manager import CreateShapeCommand, DeleteShapeCommand, MoveShapeCommand
 
 CURSOR_DEFAULT = Qt.CursorShape.ArrowCursor
 CURSOR_POINT = Qt.CursorShape.PointingHandCursor
@@ -27,6 +28,7 @@ class Canvas(QWidget):
     epsilon = 24.0
 
     def __init__(self, *args, **kwargs):
+        self.undo_manager = kwargs.pop("undo_manager", None)
         super().__init__(*args, **kwargs)
         # Initialise local state.
         self.mode = self.EDIT
@@ -52,6 +54,8 @@ class Canvas(QWidget):
         self._cursor = CURSOR_DEFAULT
         # Menus:
         self.menus = (QMenu(), QMenu())
+        self.prev_shape_points = []
+
         # Set widget options.
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.FocusPolicy.WheelFocus)
@@ -137,9 +141,13 @@ class Canvas(QWidget):
                 current_width = abs(self.current[0].x() - pos.x())
                 current_height = abs(self.current[0].y() - pos.y())
 
-                label_coordinates = getattr(
-                    self.parent().window(), "label_coordinates", None
-                )
+                parent = self.parent()
+                label_coordinates = None
+                if parent and hasattr(parent, "window") and parent.window():
+                    label_coordinates = getattr(
+                        parent.window(), "label_coordinates", None
+                    )
+
                 if label_coordinates:
                     label_coordinates.setText(
                         f"Width: {current_width:.0f}, Height: {current_height:.0f} / X: {pos.x():.0f}; Y: {pos.y():.0f}"
@@ -162,7 +170,10 @@ class Canvas(QWidget):
                     self.override_cursor(CURSOR_POINT)
                     self.current.highlight_vertex(0, Shape.NEAR_VERTEX)
 
-                if self.draw_square:
+                # Check if square mode is enabled (via toggle or holding Shift)
+                modifiers = QApplication.keyboardModifiers()
+                is_shift_pressed = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
+                if self.draw_square or is_shift_pressed:
                     init_pos = self.current[0]
                     min_x = init_pos.x()
                     min_y = init_pos.y()
@@ -317,6 +328,10 @@ class Canvas(QWidget):
         elif ev.button() == Qt.MouseButton.RightButton and self.editing():
             self.select_shape_point(pos)
             self.prev_point = pos
+
+        if self.selected_shape:
+            self.prev_shape_points = [p for p in self.selected_shape.points]
+
         self.update()
 
     def mouseReleaseEvent(self, ev):
@@ -335,6 +350,18 @@ class Canvas(QWidget):
                 self.override_cursor(CURSOR_POINT)
             else:
                 self.override_cursor(CURSOR_GRAB)
+
+            if self.undo_manager and self.prev_shape_points and self.selected_shape:
+                if self.prev_shape_points != self.selected_shape.points:
+                    self.undo_manager.push(
+                        MoveShapeCommand(
+                            self,
+                            self.selected_shape,
+                            self.prev_shape_points,
+                            self.selected_shape.points,
+                        )
+                    )
+
         elif ev.button() == Qt.MouseButton.LeftButton:
             pos = self.transform_pos(ev.position())
             if self.drawing():
@@ -453,10 +480,12 @@ class Canvas(QWidget):
             clipped_y = min(max(0, pos.y()), size.height())
             pos = QPointF(clipped_x, clipped_y)
 
-        if self.draw_square:
+        # Check if square mode is enabled (via toggle or holding Shift)
+        modifiers = QApplication.keyboardModifiers()
+        is_shift_pressed = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
+        if self.draw_square or is_shift_pressed:
             opposite_point_index = (index + 2) % 4
             opposite_point = shape[opposite_point_index]
-
             min_size = min(
                 abs(pos.x() - opposite_point.x()), abs(pos.y() - opposite_point.y())
             )
@@ -521,7 +550,9 @@ class Canvas(QWidget):
         if self.selected_shape:
             shape = self.selected_shape
             self.un_highlight(shape)
-            if self.selected_shape in self.shapes:
+            if self.undo_manager:
+                self.undo_manager.push(DeleteShapeCommand(self, shape))
+            elif self.selected_shape in self.shapes:
                 self.shapes.remove(self.selected_shape)
             self.selected_shape = None
             self.update()
@@ -584,14 +615,10 @@ class Canvas(QWidget):
         if self.current is not None and len(self.line) == 2:
             left_top = self.line[0]
             right_bottom = self.line[1]
-            rect_width = right_bottom.x() - left_top.x()
-            rect_height = right_bottom.y() - left_top.y()
             p.setPen(self.drawing_rect_color)
             brush = QBrush(Qt.BrushStyle.BDiagPattern)
             p.setBrush(brush)
-            p.drawRect(
-                int(left_top.x()), int(left_top.y()), int(rect_width), int(rect_height)
-            )
+            p.drawRect(QRectF(left_top, right_bottom))
 
         if (
             self.drawing()
@@ -600,16 +627,12 @@ class Canvas(QWidget):
         ):
             p.setPen(QColor(0, 0, 0))
             p.drawLine(
-                int(self.prev_point.x()),
-                0,
-                int(self.prev_point.x()),
-                int(self.pixmap.height()),
+                QLineF(
+                    self.prev_point.x(), 0, self.prev_point.x(), self.pixmap.height()
+                )
             )
             p.drawLine(
-                0,
-                int(self.prev_point.y()),
-                int(self.pixmap.width()),
-                int(self.prev_point.y()),
+                QLineF(0, self.prev_point.y(), self.pixmap.width(), self.prev_point.y())
             )
 
         self.setAutoFillBackground(True)
@@ -651,7 +674,10 @@ class Canvas(QWidget):
             return
 
         self.current.close()
-        self.shapes.append(self.current)
+        if self.undo_manager:
+            self.undo_manager.push(CreateShapeCommand(self, self.current))
+        else:
+            self.shapes.append(self.current)
         self.current = None
         self.set_hiding(False)
         self.newShape.emit()
@@ -713,6 +739,8 @@ class Canvas(QWidget):
                 self.move_one_pixel("Up")
             case Qt.Key.Key_Down if self.selected_shape:
                 self.move_one_pixel("Down")
+            case _:
+                super().keyPressEvent(ev)
 
     def move_one_pixel(self, direction):
         if not self.selected_shape:

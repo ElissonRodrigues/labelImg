@@ -30,3 +30,10 @@ def _ensure_resources():
 
 
 _ensure_resources()
+
+
+# Database initialization helper with automatic Alembic migrations
+def init_project_database(db_path):
+    from libs.database import init_db
+
+    return init_db(db_path)

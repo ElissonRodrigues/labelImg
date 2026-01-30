@@ -13,6 +13,7 @@ from functools import partial
 from PyQt6.QtGui import QAction, QColor, QCursor, QImage, QImageReader, QPixmap
 from PyQt6.QtCore import (
     Qt,
+    pyqtSignal,
     QByteArray,
     QFileInfo,
     QPoint,
@@ -36,6 +37,7 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QToolButton,
     QVBoxLayout,
+    QWidget,
     QWidget,
     QWidgetAction,
 )
@@ -95,6 +97,9 @@ from libs.yolo_io import TXT_EXT
 from libs.create_ml_io import CreateMLReader
 from libs.create_ml_io import JSON_EXT
 from libs.hashableQListWidgetItem import HashableQListWidgetItem
+from libs.database import init_db, Image, Annotation, Class
+from libs.statistics_dialog import StatisticsDialog
+from libs.undo_manager import UndoManager
 
 __appname__ = "labelImg"
 
@@ -140,6 +145,12 @@ class MainWindow(QMainWindow, WindowMixin):
         # Load string bundle for i18n
         self.string_bundle = StringBundle.get_bundle()
         get_str = lambda str_id: self.string_bundle.get_string(str_id)
+
+        # Database session
+        self.db_session = None
+
+        # Undo Manager
+        self.undo_manager = UndoManager()
 
         # Save as Pascal voc xml
         self.default_save_dir = default_save_dir
@@ -240,7 +251,11 @@ class MainWindow(QMainWindow, WindowMixin):
         self.light_widget = LightWidget(get_str("lightWidgetTitle"))
         self.color_dialog = ColorDialog(parent=self)
 
-        self.canvas = Canvas(parent=self)
+        self.zoom_widget = ZoomWidget()
+        self.light_widget = LightWidget(get_str("lightWidgetTitle"))
+        self.color_dialog = ColorDialog(parent=self)
+
+        self.canvas = Canvas(parent=self, undo_manager=self.undo_manager)
         self.canvas.zoomRequest.connect(self.zoom_request)
         self.canvas.lightRequest.connect(self.light_request)
         self.canvas.set_drawing_shape_to_square(
@@ -276,6 +291,22 @@ class MainWindow(QMainWindow, WindowMixin):
         # Actions
         action = partial(new_action, self)
         quit = action(get_str("quit"), self.close, "Ctrl+Q", "quit", get_str("quitApp"))
+
+        undo_action = action(
+            "Undo",
+            self.undo_manager.undo,
+            "Ctrl+Z",
+            "undo",
+            "Undo last action",
+        )
+
+        redo_action = action(
+            "Redo",
+            self.undo_manager.redo,
+            ["Ctrl+Shift+Z", "Ctrl+Y"],
+            "redo",
+            "Redo last action",
+        )
 
         open = action(
             get_str("openFile"),
@@ -340,6 +371,14 @@ class MainWindow(QMainWindow, WindowMixin):
             get_str("verifyImgDetail"),
         )
 
+        statistics = action(
+            "Statistics",
+            self.show_statistics_dialog,
+            "Ctrl+I",
+            "labels",
+            "Show Project Statistics",
+        )
+
         save = action(
             get_str("save"),
             self.save_file,
@@ -364,7 +403,7 @@ class MainWindow(QMainWindow, WindowMixin):
         save_format = action(
             get_format_meta(self.label_file_format)[0],
             self.change_format,
-            "Ctrl+Y",
+            "Ctrl+Shift+Y",
             get_format_meta(self.label_file_format)[1],
             get_str("changeSaveFormat"),
             enabled=True,
@@ -741,6 +780,8 @@ class MainWindow(QMainWindow, WindowMixin):
                 reset_all,
                 delete_image,
                 quit,
+                undo_action,
+                redo_action,
             ),
         )
         add_actions(self.menus.help, (help_default, show_info, show_shortcut))
@@ -751,6 +792,7 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.single_class_mode,
                 self.display_label_option,
                 self.auto_scroll_option,
+                statistics,
                 labels,
                 advanced_mode,
                 None,
@@ -791,6 +833,7 @@ class MainWindow(QMainWindow, WindowMixin):
             open_prev_image,
             delete_image,
             verify,
+            statistics,
             save,
             save_format,
             None,
@@ -921,15 +964,6 @@ class MainWindow(QMainWindow, WindowMixin):
         # Open Dir if default file
         if self.file_path and os.path.isdir(self.file_path):
             self.open_dir_dialog(dir_path=self.file_path, silent=True)
-
-    def keyReleaseEvent(self, event):
-        if event.key() == Qt.Key.Key_Control:
-            self.canvas.set_drawing_shape_to_square(False)
-
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Control:
-            # Draw rectangle if Ctrl is pressed
-            self.canvas.set_drawing_shape_to_square(True)
 
     # Support Functions #
     def set_format(self, save_format):
@@ -1153,7 +1187,10 @@ class MainWindow(QMainWindow, WindowMixin):
         item = self.current_item()
         if not item:
             return
+        if len(self.label_hist) > 0:
+            self.label_dialog = LabelDialog(parent=self, list_item=self.label_hist)
         text = self.label_dialog.pop_up(item.text())
+
         if text is not None:
             item.setText(text)
             item.setBackground(generate_color_by_text(text))
@@ -1181,12 +1218,8 @@ class MainWindow(QMainWindow, WindowMixin):
 
         difficult = self.diffc_button.isChecked()
 
-        try:
-            shape = self.items_to_shapes[item]
-        except:
-            pass
-        # Checked and Update
-        try:
+        shape = self.items_to_shapes.get(item)
+        if shape:
             if difficult != shape.difficult:
                 shape.difficult = difficult
                 self.set_dirty()
@@ -1194,8 +1227,6 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.canvas.set_shape_visible(
                     shape, item.checkState() == Qt.CheckState.Checked
                 )
-        except:
-            pass
 
     # React to canvas signals.
     def shape_selection_changed(self, selected=False):
@@ -1225,6 +1256,8 @@ class MainWindow(QMainWindow, WindowMixin):
         for action in self.actions.onShapesPresent:
             action.setEnabled(True)
         self.update_combo_box()
+        if shape.label not in self.label_hist:
+            self.label_hist.append(shape.label)
 
     def remove_label(self, shape):
         if shape is None:
@@ -1267,17 +1300,19 @@ class MainWindow(QMainWindow, WindowMixin):
         self.canvas.load_shapes(s)
 
     def update_combo_box(self):
-        # Get the unique labels and add them to the Combobox.
+        # 1. Update the filter Combobox (labels actually present in the list)
         items_text_list = [
             str(self.label_list.item(i).text()) for i in range(self.label_list.count())
         ]
 
         unique_text_list = list(set(items_text_list))
-        # Add a null row for showing all the labels
         unique_text_list.append("")
         unique_text_list.sort()
-
         self.combo_box.update_items(unique_text_list)
+
+        # 2. Update the "Use Default Label" Combobox (project classes from history/DB)
+        if hasattr(self, "default_label_combo_box"):
+            self.default_label_combo_box.update_items(self.label_hist)
 
     def save_labels(self, annotation_file_path):
         annotation_file_path = annotation_file_path
@@ -1861,7 +1896,10 @@ class MainWindow(QMainWindow, WindowMixin):
         else:
             target_dir_path = default_open_dir_path
         self.last_open_dir = target_dir_path
+
         self.import_dir_images(target_dir_path)
+        self.default_save_dir = target_dir_path
+
         self.default_save_dir = target_dir_path
         if self.file_path:
             self.show_bounding_box_from_annotation_file(file_path=self.file_path)
@@ -1872,6 +1910,43 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self.last_open_dir = dir_path
         self.dir_name = dir_path
+
+        # Init DB
+        try:
+            db_path = os.path.join(dir_path, "labelImg.db")
+
+            # Skip if database is already initialized for this path
+            cur_db_path = getattr(self, "current_db_path", None)
+            if cur_db_path == db_path and self.db_session:
+                Session = None  # Already initialized
+            else:
+                Session = init_db(db_path)
+                self.db_session = Session()
+                self.current_db_path = db_path
+
+            if self.undo_manager:
+                self.undo_manager.set_db_session(self.db_session)
+
+            # Load existing classes from DB to history and prioritize them
+            from libs.database import Class
+
+            classes = self.db_session.query(Class).all()
+            if classes:
+                # If we have classes in project, clear defaults and use project classes
+                self.label_hist = [cls.name for cls in classes]
+                self.update_combo_box()
+                print(
+                    f"Project loaded: {len(classes)} classes found and synchronized: {self.label_hist}"
+                )
+            else:
+                print(
+                    "Project loaded: No classes found in database yet. Current history:",
+                    self.label_hist,
+                )
+
+        except Exception as e:
+            print(f"Failed to init DB in import_dir_images: {e}")
+
         self.file_path = None
         self.file_list_widget.clear()
         self.m_img_list = self.scan_all_images(dir_path)
@@ -1882,6 +1957,7 @@ class MainWindow(QMainWindow, WindowMixin):
             item = QListWidgetItem(imgPath)
             self.file_list_widget.addItem(item)
         self.update_progress_label()
+        self.update_db_statistics()
 
     def update_progress_label(self):
         if self.img_count > 0:
@@ -2225,6 +2301,104 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def toggle_draw_square(self):
         self.canvas.set_drawing_shape_to_square(self.draw_squares_option.isChecked())
+
+    def update_db_statistics(self):
+        if not self.db_session or not self.m_img_list:
+            return
+
+        self.statusBar().showMessage("Updating statistics...")
+        QApplication.processEvents()
+
+        try:
+            # Sync Classes
+            for i in range(self.label_list.count()):
+                item = self.label_list.item(i)
+                if not item:
+                    continue
+                class_name = item.text()
+                if not class_name:
+                    continue
+                # Check if exists
+                existing_class = (
+                    self.db_session.query(Class).filter_by(name=class_name).first()
+                )
+                if not existing_class:
+                    new_class = Class(name=class_name)
+                    self.db_session.add(new_class)
+            self.db_session.commit()
+
+            # Iterate over all images in the list
+            for img_path in self.m_img_list:
+
+                # Add Image to DB if not exists
+                existing_image = (
+                    self.db_session.query(Image).filter_by(path=img_path).first()
+                )
+                if not existing_image:
+                    existing_image = Image(path=img_path)
+                    self.db_session.add(existing_image)
+                    self.db_session.flush()  # to get ID
+
+                    # Load annotations for this image (without full loading in GUI)
+                    xml_path = os.path.splitext(img_path)[0] + XML_EXT
+
+                    shapes = []
+                    if os.path.isfile(xml_path):
+                        # We need a lightweight iterator or reusing libraries.
+                        # For now, let's just rely on what we have.
+                        # Use PascalVocReader just to get shapes
+                        try:
+                            reader = PascalVocReader(xml_path)
+                            shapes = reader.get_shapes()
+                        except:
+                            pass
+
+                    for (
+                        label,
+                        create_ml_points,
+                        line_color,
+                        fill_color,
+                        difficult,
+                    ) in shapes:
+                        # Ensure class exists
+                        cls = self.db_session.query(Class).filter_by(name=label).first()
+                        if not cls:
+                            cls = Class(name=label)
+                            self.db_session.add(cls)
+                            self.db_session.flush()
+
+                        ann = Annotation(image_id=existing_image.id, class_id=cls.id)
+                        self.db_session.add(ann)
+
+            self.db_session.commit()
+
+            # Refresh history from DB - prioritize project classes
+            classes = self.db_session.query(Class).all()
+            if classes:
+                project_classes = sorted([cls.name for cls in classes])
+                self.label_hist = project_classes
+                self.update_combo_box()
+                print(
+                    f"Project statistics: {len(project_classes)} classes synchronized."
+                )
+
+            self.statusBar().showMessage("Statistics updated.", 5000)
+
+        except Exception as e:
+            print(f"Error updating statistics: {e}")
+            self.statusBar().showMessage(f"Error updating statistics: {e}", 5000)
+
+    def show_statistics_dialog(self):
+        if not self.db_session:
+            QMessageBox.warning(
+                self,
+                "Statistics",
+                "Database not initialized. Please open a directory first.",
+            )
+            return
+
+        dlg = StatisticsDialog(self, self.db_session)
+        dlg.exec()
 
 
 def inverted(color):
